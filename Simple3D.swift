@@ -2,15 +2,34 @@
 //  Simple3D.swift - Created by Matt Reagan | (@hmblebee) | 1/19/19
 //  Copyright © 2019 Matt Reagan. ** Please see README for license and info. **
 
+
+// This Swift code sample sets up a basic framework for 3D transformations and
+// rendering in a 2D space, using the Cocoa framework for graphical user interface elements on macOS.
+
+//imports the Cocoa framework, which provides functionality for macOS applications, including graphical components, event handling, and user interface management
 import Cocoa
 
-let ViewSize: CGFloat = 600.0
-let HalfViewSize: CGFloat = (ViewSize / 2.0)
-let QuarterViewSize: CGFloat = (ViewSize / 4.0)
+//These constants are defined to assist with calculations related to the size of a view:
+let ViewSize: CGFloat = 600.0// Total size of the view.
+let HalfViewSize: CGFloat = (ViewSize / 2.0)// Half the size of the view
+let QuarterViewSize: CGFloat = (ViewSize / 4.0)// Quarter of the view size
+
+// Represents the negative half of the view size, potentially used to position elements at the bottom of the view.
 let FloorHeight: CGFloat = -HalfViewSize
+
+//These lines define two colors using the NSColor class.
+// The colors are specified in the RGB color model where each color component
+// (red, green, and blue) is given a value from 0 to 255, and then normalized by dividing by 255
 let blueColor = NSColor(calibratedRed: 15.0 / 255.0, green: 171.0 / 255.0, blue: 1.0, alpha: 1.0)
 let brownColor = NSColor(calibratedRed: 110.0 / 255.0, green: 78.0 / 255.0, blue: 33.0 / 255.0, alpha: 1.0)
 
+// Axis: An enumeration that defines the three axes (x, y, z) around which rotations can occur.
+// Vec3: A structure representing a three-dimensional vector, with methods to rotate and translate this vector.
+// 3D Transformations:
+// Methods inside the Vec3 structure:
+// rotated(by:around:): Rotates the vector around a specified axis by a given angle (in radians).
+// translated(by:): Translates the vector by another vector, effectively adding the two vectors.
+// The prefix - operator is overloaded to negate the vector components.
 enum Axis { case x,y,z }
 struct Vec3 {
     let x,y,z: CGFloat
@@ -25,26 +44,45 @@ struct Vec3 {
     static prefix func -(lhs: Vec3) -> Vec3 { return Vec3(x: -lhs.x, y: -lhs.y, z: -lhs.z) }
 }
 
+//This function computes the dot product of two vectors, which is a measure of their
+//parallelism and is used in various graphics calculations.
 func dotProd(_ v1: Vec3, _ v2: Vec3) -> CGFloat { return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z }
 
+//This function translates a 3D point represented by a Vec3 to a 2D point in the
+//view using perspective division. If the z component of the vector is
+//negative, which implies the point is behind the viewer, the function returns nil
 func renderedPtFromVec3(_ vector: Vec3) -> CGPoint? {
     if vector.z < 0.0 { return nil }
     let depth = vector.z > 0.0 ? vector.z / 600.0 : 0.000001 // leastNormalMagnitude (DBL_MIN) will produce +Inf
     return CGPoint(x: vector.x / depth + HalfViewSize, y: vector.y / depth + HalfViewSize)
 }
 
+//The renderedLine(from:to:) function in Swift is designed to convert a line segment defined in a 3D space by two points (Vec3 objects) into a 2D representation (CGPoint objects). This function takes into account whether parts of the line are behind the observer (the z-component is negative) and clips the line at the plane z=0 if necessary. Here's how it works step-by-step:
 func renderedLine(from argV1: Vec3, to argV2: Vec3) -> (CGPoint, CGPoint)? {
-    if argV1.z < 0.0 && argV2.z < 0.0 { return nil }
-    if argV1.z >= 0.0 && argV2.z >= 0.0 { return (renderedPtFromVec3(argV1)!, renderedPtFromVec3(argV2)!) }
+    if argV1.z < 0.0 && argV2.z < 0.0 { return nil }//This checks if both points of the line segment are behind the viewer (i.e., both have a negative z-component). If true, the function returns nil as the line cannot be seen.
     
+    if argV1.z >= 0.0 && argV2.z >= 0.0 { return (renderedPtFromVec3(argV1)!, renderedPtFromVec3(argV2)!) } //If both points are in front of the viewer (z-component is non-negative), the function directly computes and returns the 2D projections of these points using the renderedPtFromVec3() function.
+    
+    //Sorting Points
     let v1,v2: Vec3
-    if argV1.z > argV2.z { v1 = argV1; v2 = argV2; } else { v1 = argV2; v2 = argV1; }
+    if argV1.z > argV2.z { v1 = argV1; v2 = argV2; } else { v1 = argV2; v2 = argV1; } //The function ensures that v1 is the point closer to or further into the viewer's space compared to v2. This is done to facilitate the clipping operation which comes next.
+    
+    //dVec is the direction vector from v1 to v2.
+    //n is a normal vector pointing along the z-axis, used to determine the intersection of the line segment with the z=0 plane.
+    //t calculates the interpolation parameter where the line crosses the z=0 plane using the plane equation and the direction vector.
+    //p1 computes the actual 3D coordinates of the intersection point using t.
     let dVec = v2.translated(by: -v1)
     let n = Vec3(x: 0, y: 0, z: 1)
     let t = -(dotProd(v1, n)) / dotProd(dVec, n)
     let p1 = Vec3(x: v1.x + dVec.x * t, y: v1.y + dVec.y * t, z: v1.z + dVec.z * t)
     
+    // This attempts to render both points v1 and p1. If either point fails to render
+    // (which might occur if p1.z does not properly evaluate to 0 due to floating-point
+    // precision issues), the function returns nil.
     guard let renderP0 = renderedPtFromVec3(v1), let renderP1 = renderedPtFromVec3(p1) else { return nil }
+    
+    //Finally, the function returns a tuple containing the 2D projections of the
+    //visible segments of the original line.
     return (renderP0, renderP1)
 }
 
