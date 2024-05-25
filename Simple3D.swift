@@ -10,9 +10,9 @@
 import Cocoa
 
 //These constants are defined to assist with calculations related to the size of a view:
-let ViewSize: CGFloat = 600.0// Total size of the view.
-let HalfViewSize: CGFloat = (ViewSize / 2.0)// Half the size of the view
-let QuarterViewSize: CGFloat = (ViewSize / 4.0)// Quarter of the view size
+let ViewSize: CGFloat = 600.0                   // Total size of the view.
+let HalfViewSize: CGFloat = (ViewSize / 2.0)    // Half the size of the view
+let QuarterViewSize: CGFloat = (ViewSize / 4.0) // Quarter of the view size
 
 // Represents the negative half of the view size, potentially used to position elements at the bottom of the view.
 let FloorHeight: CGFloat = -HalfViewSize
@@ -79,17 +79,21 @@ func renderedLine(from argV1: Vec3, to argV2: Vec3) -> (CGPoint, CGPoint)? {
     // This attempts to render both points v1 and p1. If either point fails to render
     // (which might occur if p1.z does not properly evaluate to 0 due to floating-point
     // precision issues), the function returns nil.
-    guard let renderP0 = renderedPtFromVec3(v1), let renderP1 = renderedPtFromVec3(p1) else { return nil }
+    guard let renderP0 = renderedPtFromVec3(v1), 
+          let renderP1 = renderedPtFromVec3(p1) else { return nil }
     
     //Finally, the function returns a tuple containing the 2D projections of the
     //visible segments of the original line.
     return (renderP0, renderP1)
 }
 
+    //This Swift code defines a Shape structure used to represent various 3D shapes and objects in a graphical application. The Shape structure includes properties for vertices, edges, faces, and additional attributes such as color and animation settings. It also provides static methods to create specific shapes like a cube, a pyramid, and a grid floor. Here’s a detailed explanation of the code:
+
 struct Shape {
-    let vectors: [Vec3]
-    let lines: [(Int, Int)]
-    let faces:  [(Int, Int, Int, Int)]
+    //The Shape structure encapsulates the data and methods for 3D shapes.
+    let vectors: [Vec3] //An array of Vec3 representing the vertices of the shape.
+    let lines: [(Int, Int)] //An array of tuples, each representing an edge by indexing into the vectors array.
+    let faces:  [(Int, Int, Int, Int)] //An array of tuples, each representing a face by indexing into the vectors array.
     let color: NSColor
     let objectCenter: Vec3
     let animates: Bool
@@ -144,7 +148,7 @@ struct Shape {
     }
 }
 
-var worldShapes = [Shape.gridFloor(of: 20, squareSize: QuarterViewSize),
+var worldShapes = [Shape.gridFloor(of: 40, squareSize: QuarterViewSize),
                    Shape.cube(width: HalfViewSize, height: HalfViewSize, at: Vec3(x: 0.0, y: 0.0, z: ViewSize), animated: true, color: blueColor),
                    Shape.pyramid(size: ViewSize, at: Vec3(x: -1200.0, y: ViewSize, z: 800.0)),
                    Shape.cube(width: QuarterViewSize, height: ViewSize, at: Vec3(x: -1200.0, y: 0.0, z: 800.0)),
