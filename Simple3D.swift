@@ -159,92 +159,132 @@ var worldShapes = [Shape.gridFloor(of: 40, squareSize: QuarterViewSize),
                    Shape.pyramid(size: ViewSize * 0.6, at: Vec3(x: 1200.0, y: 260, z: 600.0)),
                    Shape.cube(width: QuarterViewSize * 0.6, height: 380.0, at: Vec3(x: 1200.0, y: -100.0, z: 600.0))]
 
+// Define a custom NSView subclass called MyView
 class MyView: NSView {
+    // Properties for handling animation, camera angle, and position
     var shapeSpinAnimationAngle: CGFloat = 0.0
     var cameraAngle = Vec3(x: 0.0, y: 0.0, z: 0.0)
     var cameraPosition = Vec3(x: 0.0, y: 0.0, z: 1500.0)
     var turnAmount: CGFloat = 0.0
     var moveAmount: CGFloat = 0.0
     
+    // Called when the view is added to a window
     override func viewDidMoveToWindow() {
+        // Schedule a timer to call the timer() function at 60 FPS
         Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] timer in self?.timer() }
+        // Make this view the first responder for receiving key events
         DispatchQueue.main.async { self.window?.makeFirstResponder(self) }
     }
     
+    // Handle key down events for controlling movement and shooting
     override func keyDown(with event: NSEvent) {
         switch event.keyCode {
-        case 123: turnAmount = 0.05 //left
-        case 124: turnAmount = -0.05 //right
-        case 126: moveAmount = -40.0 //up
-        case 125: moveAmount = 40.0 //down
-        case 49: shootBox()
-        default: return
-        }
-    }
-    override func keyUp(with event: NSEvent) {
-        switch event.keyCode {
-        case 123, 124: turnAmount = 0.0
-        case 125, 126: moveAmount = 0.0
+        case 123: turnAmount = 0.05 // Left arrow key
+        case 124: turnAmount = -0.05 // Right arrow key
+        case 126: moveAmount = -40.0 // Up arrow key
+        case 125: moveAmount = 40.0 // Down arrow key
+        case 49: shootBox() // Spacebar key
         default: return
         }
     }
     
+    // Handle key up events to stop movement
+    override func keyUp(with event: NSEvent) {
+        switch event.keyCode {
+        case 123, 124: turnAmount = 0.0 // Stop turning
+        case 125, 126: moveAmount = 0.0 // Stop moving
+        default: return
+        }
+    }
+    
+    // Timer function called at 60 FPS
     func timer() {
+        // Update the angle for shape spinning
         shapeSpinAnimationAngle += 0.014
+        // Update the camera position and angle
         updateCamera()
+        // Mark the view as needing display to trigger a redraw
         setNeedsDisplay(bounds)
     }
     
+    // Update the camera's angle and position based on user input
     func updateCamera() {
+        // Update the camera's angle based on turn amount
         cameraAngle = Vec3(x: cameraAngle.x, y: cameraAngle.y + turnAmount, z: cameraAngle.z)
+        // Calculate the movement vector and apply it to the camera's position
         let move = Vec3(x: 0.0, y: 0.0, z: moveAmount).rotated(by: cameraAngle.y, around: .y)
         cameraPosition = Vec3(x: cameraPosition.x - move.x, y: cameraPosition.y - move.y, z: cameraPosition.z + move.z)
     }
     
+    // Box size constant
     let boxSize: CGFloat = 100.0
+    
+    // Function to shoot a box from the camera's position
     func shootBox() {
+        // Calculate the shooting angle with some randomness
         let angle = Vec3(x: cameraAngle.x, y: cameraAngle.y + CGFloat.random(in: -0.25...0.25), z: cameraAngle.z)
+        // Create a new cube shape
         let cube = Shape.cube(width: boxSize, height: boxSize, at: -cameraPosition, animated: true,
                               color: NSColor.magenta.blended(withFraction: CGFloat.random(in: 0...1.0), of: NSColor.yellow)!, bulletAngle: angle)
+        // Add the new cube to the worldShapes array
         worldShapes.append(cube)
     }
     
+    // Draw the view's contents
     override func draw(_ dirtyRect: NSRect) {
-        NSColor.black.set(); bounds.fill()
+        // Set the background color to black and fill the bounds
+        NSColor.black.set()
+        bounds.fill()
         
+        // Iterate over each shape in the worldShapes array
         for (shapeIndex, shape) in worldShapes.enumerated() {
+            // Map each vector of the shape to its transformed position
             let shapeVec = shape.vectors.map { v -> Vec3 in
                 var vec = v
+                // Apply animations and transformations to the shape's vectors
                 vec = shape.animates ? vec.translated(by: -shape.objectCenter).rotated(by: shapeSpinAnimationAngle, around: .y).translated(by: shape.objectCenter) : vec
                 
+                // Apply bullet movement if the shape is a bullet
                 if let bang = shape.bulletAngle {
                     vec = vec.translated(by: Vec3(x: 0.0, y:-pow(shape.shootTime / 2.0, 3.0), z: 10.0 * pow(shape.shootTime, 2.0)).rotated(by: -bang.y, around: .y))
+                    // Update shootTime if the bullet is still above the floor
                     if vec.y > FloorHeight + boxSize / 2.0 {
                         var updatedShape = shape
                         updatedShape.shootTime += 0.84
-                        worldShapes.remove(at: shapeIndex); worldShapes.insert(updatedShape, at: shapeIndex)
+                        worldShapes.remove(at: shapeIndex)
+                        worldShapes.insert(updatedShape, at: shapeIndex)
                     }
                 }
                 
+                // Apply camera transformations to the shape's vectors
                 return vec.translated(by: cameraPosition).rotated(by: cameraAngle.y, around: .y)
             }
             
+            // Set the shape's color for drawing
             shape.color.set()
+            // Draw each line of the shape
             for line in shape.lines {
                 guard let points = renderedLine(from: shapeVec[line.0], to: shapeVec[line.1]) else { continue }
                 NSBezierPath.strokeLine(from: points.0, to: points.1)
             }
             
+            // Set the shape's color with transparency for drawing faces
             shape.color.withAlphaComponent(0.20).set()
+            // Draw each face of the shape
             for face in shape.faces {
                 let points = [shapeVec[face.0], shapeVec[face.1], shapeVec[face.2], shapeVec[face.3]].compactMap { renderedPtFromVec3($0) }
                 guard points.count == 4 else { continue }
                 let path = NSBezierPath()
-                path.move(to: points[0]); path.line(to: points[1]); path.line(to: points[2]); path.line(to: points[3])
+                path.move(to: points[0])
+                path.line(to: points[1])
+                path.line(to: points[2])
+                path.line(to: points[3])
                 path.fill()
             }
             
+            // Set the color for drawing the vertices
             NSColor.green.set()
+            // Draw each vertex of the shape
             for vector in shapeVec {
                 guard let pt = renderedPtFromVec3(vector) else { continue }
                 CGRect(x: pt.x, y: pt.y, width: 0.0, height: 0.0).insetBy(dx: -1.0, dy: -1.0).fill()
@@ -253,5 +293,6 @@ class MyView: NSView {
     }
 }
 
+// Main application delegate class
 @NSApplicationMain
 class AppDelegate: NSObject, NSApplicationDelegate { }
